@@ -9,6 +9,12 @@
 #include "stm32g0xx.h"
 #include "BoardSetup.h"
 
+
+#ifdef RELEASE
+#define APPLICATION_ADDRESS (uint32_t)0x08001800 /**< Место старта прошивы, с 4-ой страницы памяти */
+#endif
+
+
 #ifdef PowerUSE
 #include "board_PowerModes.h"
 #endif
@@ -40,14 +46,13 @@
 #endif
 
 
-
-
-
-
-
-
 int main(void)
 {
+#ifdef RELEASE
+    SCB->VTOR = APPLICATION_ADDRESS;
+    __enable_irq();
+#endif    
+
 #ifdef debug1	
 __disable_irq();	
   RCC->IOPENR |= RCC_IOPENR_GPIOAEN |                     // enable clock for GPIO 
@@ -69,7 +74,9 @@ __disable_irq();
 	
 GPIOB->BSRR = GPIO_BSRR_BS10;  
 #endif	
+
   BSInit();
+
 #ifdef debug1	
 GPIOB->BSRR = GPIO_BSRR_BS10;
 __enable_irq();	
@@ -85,25 +92,24 @@ __disable_irq();
 SuperLoopACC_init();
 #endif
 
+
+
 #ifdef LCDUSE
 SLD_init();
 #endif
 
+
 #ifdef 	COMMS && PLAYER
 	tim3Init();
 	initSpi_1();
-	SLC_init();
-	SLP_init();
+
+    uart1Init();
+	__flashInit();
+    
+    SLP_init();
  __flashInit();
 #endif	
 
-#ifdef 	COMMS 
-SLC_init();
-#endif
-
-#ifdef 	PLAYER 
-SLP_init();
-#endif
 
 		
   while(1){

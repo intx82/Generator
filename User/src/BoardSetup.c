@@ -35,15 +35,15 @@ uint16_t button_sign;
 
 void SysTick_Handler(void) 
 {
-  static uint32_t ledTick = 0;
+//  static uint32_t ledTick = 0;
 	static uint16_t ss;
 	static uint8_t status=0;	
 	static uint32_t button_new; 
 	static uint16_t	button_old, button_stable_new, button_stable_old;
 	
 	SystemTicks++;
-//	ledTick++;
-//  if (ledTick >= 200)   
+    
+   
 //		{ledTick = 0;
 //		 switch (	status )   // Led Light according to SystemStatus
 //		 {

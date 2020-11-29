@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<root>
+  <log>
+    <path>\log</path>
+    <file>log_</file>
+    <level>info</level>
+  </log>
+  <devs>
+    <dev_gen>
+      <!-- 0x7a70 ('z','p')-->
+      <signature>31344</signature>
+      <spm_pagesize>2048</spm_pagesize>
+      <page_count>29</page_count>
+      <key>c/ISirhC2BfxpDGzLDQPTA==</key>
+    </dev_gen>
+  </devs>
+</root>
