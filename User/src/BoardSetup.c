@@ -3,7 +3,7 @@ Setting up shared resources that are used by multiple software modules
 */
 
 #include "BoardSetup.h"
-#include "stm32g030xx.h"
+#include "stm32g0xx.h"
 #include "fpga.h"
 
 
