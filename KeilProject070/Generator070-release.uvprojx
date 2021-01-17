@@ -275,8 +275,8 @@
               </OCR_RVCT3>
               <OCR_RVCT4>
                 <Type>1</Type>
-                <StartAddress>0x8001800</StartAddress>
-                <Size>0x1d800</Size>
+                <StartAddress>0x8003800</StartAddress>
+                <Size>0x1c800</Size>
               </OCR_RVCT4>
               <OCR_RVCT5>
                 <Type>1</Type>
@@ -328,7 +328,7 @@
             <uC99>1</uC99>
             <uGnu>1</uGnu>
             <useXO>0</useXO>
-            <v6Lang>3</v6Lang>
+            <v6Lang>5</v6Lang>
             <v6LangP>3</v6LangP>
             <vShortEn>1</vShortEn>
             <vShortWch>1</vShortWch>
@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>RELEASE</Define>
               <Undefine></Undefine>
-              <IncludePath>..\User\inc;..\ugfx_2.9\src\gdisp;..\ugfx_2.9\src;..\ugfx_2.9;..\ugfx_2.9\src\gos;..\ugfx_2.9\src\gwin;..\ugfx_2.9\drivers\gdisp\ILI9341;..\ugfx_2.9\src\ginput;..\ugfx_2.9\drivers\ginput\toggle\Pal;..\Display;..\ugfx_2.9\drivers\ginput\touch\FT6x06;..\DriversCommon;..\PowerModes;..\W25QXX;..\Communications;..\Player;..\acc;..\PowerModes</IncludePath>
+              <IncludePath>..\User\inc;..\ugfx_2.9\src\gdisp;..\ugfx_2.9\src;..\ugfx_2.9;..\ugfx_2.9\src\gos;..\ugfx_2.9\src\gwin;..\ugfx_2.9\drivers\gdisp\ILI9341;..\ugfx_2.9\src\ginput;..\ugfx_2.9\drivers\ginput\toggle\Pal;..\Display;..\ugfx_2.9\drivers\ginput\touch\FT6x06;..\DriversCommon;..\PowerModes;..\W25QXX;..\Communications;..\Player;..\acc;..\PowerModes;..\CommModbus;..\spiffs\src;..\spiffs\src\default;..\FreeModbus</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -392,6 +392,11 @@
               <FileName>BoardSetup.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\src\BoardSetup.c</FilePath>
+            </File>
+            <File>
+              <FileName>spiffs.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\src\spiffs.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -447,16 +452,6 @@
               <FileName>SuperLoop_Comm.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Communications\SuperLoop_Comm.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>W25qxx</GroupName>
-          <Files>
-            <File>
-              <FileName>w25qxx.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\W25QXX\w25qxx.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -547,6 +542,211 @@
               <FileName>DOCGEN.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\DOC\DOCGEN.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>freemodbus</GroupName>
+          <Files>
+            <File>
+              <FileName>SL_CommModbus.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\CommModbus\SL_CommModbus.h</FilePath>
+            </File>
+            <File>
+              <FileName>SL_CommModbus.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\CommModbus\SL_CommModbus.c</FilePath>
+            </File>
+            <File>
+              <FileName>mb.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mb.c</FilePath>
+            </File>
+            <File>
+              <FileName>mb.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\mb.h</FilePath>
+            </File>
+            <File>
+              <FileName>mbascii.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mbascii.c</FilePath>
+            </File>
+            <File>
+              <FileName>mbascii.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\mbascii.h</FilePath>
+            </File>
+            <File>
+              <FileName>mbconfig.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\mbconfig.h</FilePath>
+            </File>
+            <File>
+              <FileName>mbcrc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mbcrc.c</FilePath>
+            </File>
+            <File>
+              <FileName>mbcrc.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\mbcrc.h</FilePath>
+            </File>
+            <File>
+              <FileName>mbframe.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\mbframe.h</FilePath>
+            </File>
+            <File>
+              <FileName>mbfunc.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\mbfunc.h</FilePath>
+            </File>
+            <File>
+              <FileName>mbfunccoils.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mbfunccoils.c</FilePath>
+            </File>
+            <File>
+              <FileName>mbfuncdiag.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mbfuncdiag.c</FilePath>
+            </File>
+            <File>
+              <FileName>mbfuncdisc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mbfuncdisc.c</FilePath>
+            </File>
+            <File>
+              <FileName>mbfuncholding.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mbfuncholding.c</FilePath>
+            </File>
+            <File>
+              <FileName>mbfuncinput.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mbfuncinput.c</FilePath>
+            </File>
+            <File>
+              <FileName>mbfuncother.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mbfuncother.c</FilePath>
+            </File>
+            <File>
+              <FileName>mbport.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\mbport.h</FilePath>
+            </File>
+            <File>
+              <FileName>mbproto.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\mbproto.h</FilePath>
+            </File>
+            <File>
+              <FileName>mbrtu.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mbrtu.c</FilePath>
+            </File>
+            <File>
+              <FileName>mbrtu.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\mbrtu.h</FilePath>
+            </File>
+            <File>
+              <FileName>mbtcp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mbtcp.c</FilePath>
+            </File>
+            <File>
+              <FileName>mbtcp.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\mbtcp.h</FilePath>
+            </File>
+            <File>
+              <FileName>mbutils.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\mbutils.c</FilePath>
+            </File>
+            <File>
+              <FileName>mbutils.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\mbutils.h</FilePath>
+            </File>
+            <File>
+              <FileName>port.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\port.h</FilePath>
+            </File>
+            <File>
+              <FileName>portevent.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\portevent.c</FilePath>
+            </File>
+            <File>
+              <FileName>portserial.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\portserial.c</FilePath>
+            </File>
+            <File>
+              <FileName>porttimer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\porttimer.c</FilePath>
+            </File>
+            <File>
+              <FileName>tim1.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\FreeModbus\tim1.c</FilePath>
+            </File>
+            <File>
+              <FileName>tim1.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\FreeModbus\tim1.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>spiffs</GroupName>
+          <Files>
+            <File>
+              <FileName>spiffs.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\spiffs\src\spiffs.h</FilePath>
+            </File>
+            <File>
+              <FileName>spiffs_cache.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\spiffs\src\spiffs_cache.c</FilePath>
+            </File>
+            <File>
+              <FileName>spiffs_check.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\spiffs\src\spiffs_check.c</FilePath>
+            </File>
+            <File>
+              <FileName>spiffs_gc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\spiffs\src\spiffs_gc.c</FilePath>
+            </File>
+            <File>
+              <FileName>spiffs_hydrogen.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\spiffs\src\spiffs_hydrogen.c</FilePath>
+            </File>
+            <File>
+              <FileName>spiffs_nucleus.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\spiffs\src\spiffs_nucleus.c</FilePath>
+            </File>
+            <File>
+              <FileName>spiffs_nucleus.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\spiffs\src\spiffs_nucleus.h</FilePath>
+            </File>
+            <File>
+              <FileName>spiffs_config.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\spiffs\src\default\spiffs_config.h</FilePath>
             </File>
           </Files>
         </Group>

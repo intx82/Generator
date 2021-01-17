@@ -49,7 +49,7 @@ int spiffs_init();
 #endif
 
 #ifdef RELEASE
-#define APPLICATION_ADDRESS (uint32_t)0x08001800 /**  offset start address */
+#define APPLICATION_ADDRESS (uint32_t)0x08003800 /**  offset start address */
 
 void _ttywrch(int ch)
 {
@@ -148,19 +148,6 @@ SLP_init();
 SL_CommModbusInit();
 #endif
 
-
-//test flash
-//uint8_t temp_pBuffer;
-//W25qxx_EraseSector(0);
-//W25qxx_WriteByte(0x55, 0);
-//W25qxx_ReadByte(&temp_pBuffer, 0);
-//end test flash
-
-//debug FPGA config
-//fpgaConfig();
-//fpgaConfig();
-//end debug FPGA config	
-		
   while(1){
 
 #ifdef 	COMMS 
