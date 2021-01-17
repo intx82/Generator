@@ -211,6 +211,7 @@ uint16_t findEmptySector(void)
 	}
 	return sectAddr;
     */
+   return 0;
 }
 
 void erFlash(uint8_t firstSectAddr, uint8_t lastSectAddr)

@@ -170,46 +170,52 @@ const t_I2c16InitData bq25703InitData[eBQ25703_NumOfReg]=
 
 };
 
-inline uint16_t BQ25703_ChargeCurrent_Eval(uint16_t I)//arg in mA
+uint16_t BQ25703_ChargeCurrent_Eval(uint16_t I)//arg in mA
 {
 	//In order to prevent any accidental SW mistakes, the host sets low input current limit (a few hundred milliamps)
 	//when device is out of HIZ.
 	return ((I/64)<<6)&(0b0001111111000000);//10 Om res
 }
-inline uint16_t BQ25703_ChargeVoltage_Eval(uint16_t V)//arg in mV
+ uint16_t BQ25703_ChargeVoltage_Eval(uint16_t V)//arg in mV
 {
 	return ((V/16)<<4)&(0b0111111111110000);
 }
-inline uint16_t BQ25703_MinSystemVoltage_Eval(uint16_t V)//arg in mV
+ uint16_t BQ25703_MinSystemVoltage_Eval(uint16_t V)//arg in mV
 {
 	return ((V/256)<<8)&(0b0011111100000000);
 }
-inline uint16_t BQ25703_IIN_HOST_Eval(uint16_t I)//arg in mA
+ uint16_t BQ25703_IIN_HOST_Eval(uint16_t I)//arg in mA
 {
 	//With code 0, the input current limit is 50 mA.
-	if (I<50) {I=50;};//  10 Ohm //if (I<100) {I=100;};
+	if (I<50) 
+    {
+        I=50;
+    }//  10 Ohm //if (I<100) {I=100;};
 	return (((I)/50)<<8)&(0x7f00);//10 Ohm //5 Om RES
 }
 
-inline uint16_t BQ25703_InputVoltage_Eval(uint16_t V)//arg in mA
+uint16_t BQ25703_InputVoltage_Eval(uint16_t V)//arg in mA
 {
-	if (V<3200) {V=3200;};
+	if (V<3200) 
+    {
+        V=3200;
+    }
 	return (((V)/64)<<6)&(0x3fc0);//
 }
 
-inline uint16_t BQ25703_IBAT_CH(uint16_t data16)
+uint16_t BQ25703_IBAT_CH(uint16_t data16)
 {
 	return (data16>>8)*64;
 }
-inline uint16_t BQ25703_IBAT_DCH(uint16_t data16)   
+ uint16_t BQ25703_IBAT_DCH(uint16_t data16)   
 {
 	return (data16&0xff)*256;
 }
-inline uint16_t BQ25703_VSYS(uint16_t data16)//V. mV
+ uint16_t BQ25703_VSYS(uint16_t data16)//V. mV
 {
 	return (data16>>8)*64+2880;
 }
-inline uint16_t BQ25703_VBAT(uint16_t data16) //V. mV  
+ uint16_t BQ25703_VBAT(uint16_t data16) //V. mV  
 {
 	return (data16&0xff)*64+2880;
 }

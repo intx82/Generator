@@ -1,6 +1,8 @@
 
 #include "stm32g0xx.h"
 #include "spiffs.h"
+#include "tim3.h"
+#include "Spi1.h"
 
 //#define FLASH_TEST
 #define W25_CHIP_ERASE 0xC7
@@ -20,7 +22,7 @@
 
 #define W25_ERASE_TIMEOUT 3000
 
-spiffs fs;
+static spiffs fs;
 
 extern uint8_t spiDispCapture;
 
@@ -110,7 +112,7 @@ static void flash_chip_erase()
     
 }
 
-static s32_t w25_flash_read(int addr, int size, char *buf)
+static s32_t w25_flash_read(uint32_t addr, uint32_t size, uint8_t *buf)
 {
   
     spi_cs_on();
@@ -133,7 +135,7 @@ static s32_t w25_flash_read(int addr, int size, char *buf)
 /**
 * Write flash page
 */
-static void w25_write_page(uint32_t addr, size_t size, char* buf)
+static void w25_write_page(uint32_t addr, size_t size, uint8_t* buf)
 {
     set_write_ena();
 
@@ -156,7 +158,7 @@ static void w25_write_page(uint32_t addr, size_t size, char* buf)
 /**
 * Write data into flash, up-to 256 bytes
 */
-static s32_t w25_flash_write(int addr, int size, char *buf)
+static s32_t w25_flash_write(uint32_t addr, uint32_t size, uint8_t *buf)
 {
    
     do
@@ -178,7 +180,7 @@ static s32_t w25_flash_write(int addr, int size, char *buf)
 * @param addr Erase address
 * @apram size Size which should be erased
 */
-static s32_t w25_flash_erase(int addr, int size)
+static s32_t w25_flash_erase(uint32_t addr, uint32_t size)
 {
     
     set_write_ena();
@@ -394,7 +396,7 @@ int on_modbus_write_file(uint8_t* buf, size_t len)
         return 0x81;
     }
     
-    char* ptr = (char*) &buf[1];
+    uint8_t* ptr = &buf[1];
     memcpy(&fname[0], ptr, fname_len);        
     ptr += fname_len;
     
@@ -402,7 +404,7 @@ int on_modbus_write_file(uint8_t* buf, size_t len)
     ptr += sizeof(uint32_t);
 
         
-    int res = spiffs_write_file_part(fname, fname_len, offset, ptr, len - (ptr - (char*)buf)); 
+    int res = spiffs_write_file_part(fname, fname_len, offset, ptr, len - (ptr - buf)); 
     
     return res;
 }

@@ -1,10 +1,11 @@
 #include "Spi1.h"
+#include "gfx.h"
 
 uint32_t txallowed = 1U;
 extern uint8_t spiDispCapture;
 
 
-void initSpi_1(void){
+void spi1_init(void){
     NVIC_DisableIRQ(SPI1_IRQn); 
     RCC->APBENR2 |= RCC_APBENR2_SPI1EN;                     // enable SPI1 clk
   

@@ -19,6 +19,7 @@
 #include "mainFSM.h"
 #include "board_PowerModes.h"
 #include "BoardSetup.h"
+#include "Spi1.h"
 
 extern char	heap[GFX_OS_HEAP_SIZE];
 extern gThread	hThread;
@@ -329,7 +330,7 @@ static void createLabels(void) {
 
 int SLD_DisplInit(void)
 { 
-    initSpi_1();
+    spi1_init();
     GFXPreinit();	
     gfxInit();	
 
@@ -447,7 +448,7 @@ int SLDw(void)
 			fileTimeArr[6]=fileSec/10;
 			fileTimeArr[7]=fileSec%10;
 			timeToString(fileTimeArr);
-			gwinSetText(ghLabel6,fileTimeArr,gTrue);
+			gwinSetText(ghLabel6,(const char*)fileTimeArr,gTrue);
 		}
 		
 		//Total timer
@@ -476,7 +477,7 @@ int SLDw(void)
 		totalTimeArr[6]=totalSec/10;
 		totalTimeArr[7]=totalSec%10;
 		timeToString(totalTimeArr);
-		gwinSetText(ghLabel7,totalTimeArr,gTrue);
+		gwinSetText(ghLabel7,(const char*)totalTimeArr,gTrue);
 	}
 
 return 0;	

@@ -8,9 +8,10 @@
 #include "I2C_COMMON.h"
 
 void voidfun(void)
-{};
-
-void voidfun8(uint8_t a )
 {
-	a;
+};
+
+void voidfun8(uint8_t a)
+{
+	(void)a;
 };

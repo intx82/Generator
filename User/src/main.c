@@ -6,6 +6,7 @@
 #include <string.h>
 #include "stm32g0xx.h"
 #include "BoardSetup.h"
+#include "Spi1.h"
 
 #ifdef PowerUSE
 #include "board_PowerModes.h"
@@ -25,14 +26,12 @@
 //#include "rn4870Model.h"
 #include "uart.h"
 #include "flash.h"
-#include "Spi.h"
 #include "tim3.h"
 #endif
 
 #ifdef PLAYER
 #include "fpga.h"
 #include "flash.h"
-#include "Spi.h"
 #include "tim3.h"
 #endif
 
@@ -126,7 +125,7 @@ SuperLoopACC_init();
 
 #if defined COMMS || defined PLAYER
 	tim3Init();
-	initSpi_1();
+	spi1_init();
 	SLC_init();
 	SLP_init();
 

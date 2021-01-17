@@ -1,3 +1,4 @@
+#include <string.h>
 #include "SL_CommModbus.h"
 
 #include "mb.h"
@@ -83,7 +84,8 @@ eMBErrorCode eMBRegInputCB( UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNRe
         
     if(reg >= SERIAL_REG && reg < (SERIAL_REG + (sizeof(SERIAL)>>1)))
     {     
-        memcpy(pucRegBuffer,SERIAL, sizeof(SERIAL));
+
+        memcpy((void*)pucRegBuffer,(const void*)SERIAL, sizeof(SERIAL));
         return MB_ENOERR;
     }
     

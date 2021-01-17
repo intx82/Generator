@@ -9,7 +9,7 @@
 
 // for interraction with PWR
 typedef enum  {e_FSMS_SLPl_Off,e_FSMS_SLPl_On,e_FSMS_SLPl_NumOfEl} e_FSMState_SuperLoopPlayer;
-extern __inline e_FSMState_SuperLoopPlayer SLPl_FSMState(void);
+e_FSMState_SuperLoopPlayer SLPl_FSMState(void);
 
 
 // For main
@@ -59,6 +59,11 @@ void spi2FifoClr(void);
 void loadMultToFpga(void);
 void loadFreqToFpga(uint16_t addr);
 void startFpga(void);
+
+/**
+* Initialize file-list
+*/
+void fileListInit(void);
 
 extern void setTotalTimer(void);
 extern void setFileTimer(void);
