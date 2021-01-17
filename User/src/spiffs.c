@@ -31,6 +31,8 @@ static u8_t spiffs_fds[32 * 4];
 static u8_t spiffs_cache_buf[(SPIFFS_CFG_LOG_PAGE_SZ() + 32) * 4];
 
 
+
+
 /**
 * Retrieve flash memory status
 */

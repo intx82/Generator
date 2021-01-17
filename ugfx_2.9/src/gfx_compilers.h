@@ -621,7 +621,6 @@
 			#define GFX_COMPILER_VERSION_MINOR		((__C251__)%100)
 		#endif
 		#define DEPRECATED(msg)						__attribute__((deprecated(msg)))
-	
 		#ifndef GFXINLINE							// Get the Keil definition for inline
 			#define GFXINLINE	__inline
 		#endif

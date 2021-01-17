@@ -1,6 +1,15 @@
+/**
+\file
+
+
+\todo on/off PWR
+
+*/
+
 #include "Spi1.h"
 #include "SuperLoop_Player.h"
-#include "fpga.h"
+#include "board_PowerModes.h"
+#include "BoardSetup.h"
 
 uint16_t freqStartByte;
 uint32_t freq;
@@ -10,13 +19,17 @@ extern volatile uint32_t playClk;
 volatile uint32_t durTimeMs;
 volatile uint32_t durTimeS;
 uint16_t steps;
+uint16_t startSectAddr;
 
 extern volatile int playFileInList;
-uint16_t playFileSector;
+extern uint16_t playFileSector;
+uint16_t playFileSectorBegin;
 uint8_t i=0;
+uint16_t frstChMult=0;
+uint16_t scndChMult=0;
 
-
-#define  playParamArr_size 7
+#define  playParamArr_size 8
+#define FPGA_GAIN 16313
 
 uint32_t playParamArr[playParamArr_size];
 /*************************************
@@ -27,8 +40,11 @@ playParamArr[3] - duration
 playParamArr[4] - negative
 playParamArr[5] - up
 playParamArr[6] - inverse
+playParamArr[7] - out voltage
 **************************************/
-
+uint32_t playFreqArr_1[100];
+uint32_t playFreqArr_2[100];
+uint32_t playFreqArr[200];
 uint8_t timeArr[3];
 /*******************************
 [0] - hours
@@ -42,23 +58,14 @@ uint8_t fileSec=0;
 uint8_t fileMin=0;
 uint8_t fileHour=0;
 
-//------------------------ for power---------------------------------------------
-e_FSMState_SuperLoopPlayer SLPl_FSM_State;
+//uint8_t totalTimeArr[];
+//uint8_t fileTimeArr[];
 
-__inline e_FSMState_SuperLoopPlayer SLPl_FSMState(void)
-{
-	return SLPl_FSM_State;
-};
+//fileTimeArr={'0','0',':','0','0',':','0','0',0};
+//totalTimeArr={'0','0',':','0','0',':','0','0',0};
 
+volatile uint32_t playClk;
 
-bool SuperLoop_Player_SleepIn(void)
-{
-	return true;
-};
-bool SuperLoop_Player_SleepOut(void)
-{
-	return true;
-};
 
 //-------------------------for SPI2-----------------------------------------------
 void initSpi_2(void)
@@ -75,6 +82,28 @@ void initSpi_2(void)
 	SPI2->CR2 |= SPI_CR2_FRXTH;															// RXNE event is generated if the FIFO level is greater than or equal to 1/4 (8-bit)
 //							 SPI_CR2_RXNEIE;														// enable SPI2 RXNE interrupt
   SPI2->CR1 |= SPI_CR1_SPE;                               // enable SPI2 perif
+}
+
+/**
+*			The correct disable procedure is (except when receive only mode is used):
+*			1. Wait until FTLVL[1:0] = 00 (no more data to transmit).
+*			2. Wait until BSY=0 (the last data frame is processed).
+*			3. Disable the SPI (SPE=0).
+*			4. Read data until FRLVL[1:0] = 00 (read all the received data).
+*
+**************************************************************************************************************************/
+
+void disableSpi_2(void){
+
+	while (SPI2->SR & SPI_SR_FTLVL_Msk){}										//  Wait until FTLVL[1:0] = 00 (no more data to transmit)
+	while (SPI2->SR & SPI_SR_BSY){}													//	Wait until BSY=0 (the last data frame is processed)	
+		
+	NVIC_DisableIRQ(SPI2_IRQn);										 
+  SPI2->CR1 &= ~SPI_CR1_SPE;                              // disable SPI1 perif
+		
+	while (SPI2->SR & SPI_SR_FRE_Msk){ SPI2->DR; }					// Read data until FRLVL[1:0] = 00 (read all the received data)				
+	RCC->APBENR2 &= ~RCC_APBENR2_SPI1EN;                    // disable SPI1 clk
+              
 }
 
 
@@ -130,28 +159,21 @@ void tim3Init(void)
 	TIM3->CR1 = TIM_CR1_CEN;
 }
 
-void delay_ms(uint32_t delayTime)
-{
-    TIM3->CNT = 0;
-	uint32_t timeout = tim3TickCounter + delayTime;
-	while(tim3TickCounter < timeout)
-    {}
+void delay_ms(uint32_t delayTime){
+	tim3TickCounter = delayTime;
+	while(tim3TickCounter){}
 }
 
 void TIM3_IRQHandler(void)
 {
-	if(TIM3->SR & TIM_SR_UIF)
-    {
+	if(TIM3->SR & TIM_SR_UIF){
 		TIM3->SR = ~TIM_SR_UIF;
-		tim3TickCounter++;
-		
-        if(fpgaFlags.clockStart==1)
-        {
+		tim3TickCounter--;
+		if(fpgaFlags.clockStart==1){
 			playClk++;
 			durTimeMs++;
 		}
-		else
-        {
+		else{
 			playClk=0;
 			durTimeMs=0;
 		}
@@ -159,52 +181,6 @@ void TIM3_IRQHandler(void)
 }
 
 //-----------------------------------for player---------------------------------------
-
-//void fpgaConfig(void)
-//{
-//	uint8_t bytesConfBuff[CONF_BUFF_SIZE];
-//	uint32_t bytesCnt;
-//	uint32_t bytesRemain=CONF_FILE_SIZE;
-//	uint16_t bytesToRead;
-//	
-//	SPI2->CR1 &= ~SPI_CR1_SPE;
-//	SPI2->CR1 |= SPI_CR1_LSBFIRST;
-//	SPI2->CR1 |= SPI_CR1_SPE;
-//	GPIOB->BSRR=GPIO_BSRR_BR0;							//FPGA 1.2 V on
-//	nCONFIG_H;
-//	while(!(GPIOC->IDR & GPIO_IDR_ID7)){}
-//	delay_ms(1);
-//	FPGA_CS_L;															//for logger
-//	while(bytesRemain>0){
-//		bytesCnt+=bytesToRead;
-//		bytesRemain=CONF_FILE_SIZE-bytesCnt;
-//		if(bytesRemain>=CONF_BUFF_SIZE){
-//			bytesToRead=CONF_BUFF_SIZE;
-//		}
-//		else{
-//			bytesToRead=bytesRemain;
-//		}
-//		W25qxx_ReadBytes(bytesConfBuff,FIRST_CONF_BYTE+10+bytesCnt,bytesToRead);
-//		spi2Transmit(bytesConfBuff, bytesToRead);
-//		if(GPIOC->IDR & GPIO_IDR_ID6){
-//			spi2Transmit(0x00, 1);
-//			confComplete();
-//			fpgaFlags.fpgaConfigComplete=1;
-//			fpgaFlags.fpgaConfigCmd=0;
-//			FPGA_CS_H;
-//			SPI2->CR1 &= ~SPI_CR1_SPE;
-//			SPI2->CR1 &= ~SPI_CR1_LSBFIRST;
-//			SPI2->CR1 |= SPI_CR1_SPE;
-//			return;
-//		}
-//	}
-//	FPGA_CS_H;
-//	confFailed();
-//	fpgaFlags.fpgaConfigComplete=0;
-//	fpgaFlags.fpgaConfigCmd=0;
-//}
-
-//As in VV2
 /**
 \brief Passive Serial FPGA configuration
 
@@ -223,8 +199,8 @@ until all the power supplies are stable.
 MSEL[2:0] Pins 000 Standard POR Delay
 
 nSTATUS and CONF_DONE driven low
-• All I/Os pins are tied to an internal weak pull-up
-• Clears configuration RAM bits
+â€¢ All I/Os pins are tied to an internal weak pull-up
+â€¢ Clears configuration RAM bits
       ->
 nSTATUS and nCONFIG released high
 CONF_DONE pulled low
@@ -232,16 +208,16 @@ CONF_DONE pulled low
 Writes configuration data to
 FPGA
       ->
-• nSTATUS pulled low
-• CONF_DONE remains low
-• Restarts configuration if option
+â€¢ nSTATUS pulled low
+â€¢ CONF_DONE remains low
+â€¢ Restarts configuration if option
 enabled		
       ->
 CONF_DONE released high
       ->
-• Initializes internal logic and
+â€¢ Initializes internal logic and
 registers
-• Enables I/O buffers
+â€¢ Enables I/O buffers
       ->
 INIT_DONE released high
 (if option enabled)
@@ -250,7 +226,6 @@ Executes your design
 */
 void fpgaConfig(void)											//
 {
-    /*
 	uint32_t bytesCnt=0;
 	uint8_t byteBuff;
 //	byteBuff=0;
@@ -264,10 +239,10 @@ void fpgaConfig(void)											//
 	delay_ms(100);// test -> ok
 	switchOUTStageInterfacePinsToPwr(ENABLE);
 	delay_ms(10);
-	spi1FifoClr();
+///rdd debug	spi1FifoClr();
 //	GPIOB->BSRR=GPIO_BSRR_BR0;							//FPGA 1.2 V on
 	nCONFIG_H;
-	while(!(GPIOC->IDR & GPIO_IDR_ID7)){}
+	while(!(GPIOC->IDR & GPIO_IDR_ID7)){/** \todo timeout */}
 	delay_ms(10);
 	FPGA_CS_L;															//for logger
 	for(bytesCnt=0;bytesCnt<CONF_FILE_SIZE;bytesCnt++){
@@ -290,74 +265,29 @@ void fpgaConfig(void)											//
 	FPGA_CS_H;
 //	confFailed();
 	fpgaFlags.fpgaConfigComplete=0;
-    */
 }
 
 extern uint8_t fileName[50];
 extern uint8_t fileSect;
 
-//void getFileList(void)
-//{
-//	uint8_t sect;
-//	for(sect=0;sect<MAX_FILES_NUM;sect++){
-//		
-//			spi1FifoClr();
-//			W25qxx_ReadSector((uint8_t*)fileName,sect,FILE_NAME_SHIFT,FILE_NAME_BYTES);
-//			spi1FifoClr();
-//			gwinListAddItem(ghList1, (char*)fileName, gTrue);
-//		}
-//	}
-//}
-
-//
 void timeToString(uint8_t* timeArr)
 {
-	for(int i=0;i<8;i++){
-		switch(timeArr[i]){
-			case 0:
-				timeArr[i]='0';
-				break;
-			case 1:
-				timeArr[i]='1';
-				break;
-			case 2:
-				timeArr[i]='2';
-				break;
-			case 3:
-				timeArr[i]='3';
-				break;
-			case 4:
-				timeArr[i]='4';
-				break;
-			case 5:
-				timeArr[i]='5';
-				break;
-			case 6:
-				timeArr[i]='6';
-				break;
-			case 7:
-				timeArr[i]='7';
-				break;
-			case 8:
-				timeArr[i]='8';
-				break;
-			case 9:
-				timeArr[i]='9';
-				break;
-			default:
-				break;
-		}
+	for (int i = 0; i < 8; i++)
+	{
+        if( timeArr[i] < 10) 
+        {
+            timeArr[i] = timeArr[i] + '0';
+        }
+        else
+        {
+					timeArr[i] = ':';
+        }
 	}
-}
-
-uint16_t getPlayFileSector(int fileInList)
-{
-    return 0;
+    timeArr[9] = 0;
 }
 
 void getControlParam(uint16_t fileSect)
 {
-    /*
 	uint8_t temp;
 	uint8_t tempArr[6];
 	uint16_t byteCnt=0;
@@ -365,20 +295,18 @@ void getControlParam(uint16_t fileSect)
 	uint8_t chrCnt=0;
 	uint32_t startAddr=fileSect*SECTOR_SIZE;
 	
-	
-    do{																							//skip first line	
-		W25qxx_ReadByte(&temp,startAddr+byteCnt);
+	do{																							//skip first line	
+//		W25qxx_ReadByte(&temp,startAddr+byteCnt);
 		byteCnt++;
 	}while(temp!='\n');
-    
 	
 	for(int i=0;i<playParamArr_size;i++) {playParamArr[i]=0;}
 	
-	while(strCnt<7){																//fill an array of parameters
-		W25qxx_ReadByte(&temp,startAddr+byteCnt);
+	while(strCnt<playParamArr_size){																//fill an array of parameters
+//		W25qxx_ReadByte(&temp,startAddr+byteCnt);
 		byteCnt++;
 		if((temp>='0')&&(temp<='9')){
-			tempArr[chrCnt]=temp; // \todo check array overflow 
+			tempArr[chrCnt]=temp; /** \todo check array overflow */
 			chrCnt++;
 			continue;
 		}
@@ -393,14 +321,74 @@ void getControlParam(uint16_t fileSect)
 		}
 	}
 	freqStartByte=startAddr+byteCnt;
-    */
+}
+
+int verifyControlParam(void)
+{
+	//todo verify code
+    return 0;
+}
+
+void getFreq(uint16_t fileSect)
+{
+	uint8_t temp;
+	uint8_t tempArr[7];
+	uint16_t byteCnt=0;
+	uint8_t strCnt=0;
+	uint8_t chrCnt=0;
+//	uint32_t startAddr=fileSect*SECTOR_SIZE;
+	uint8_t even=0;
+	uint8_t index_1=0;
+	uint8_t	index_2=0;
+	
+	for(int i=0;i<100;i++){
+		playFreqArr_1[i]=0;
+		playFreqArr_2[i]=0;
+	}
+	
+	while(strCnt<playParamArr[0]){									//fill an array of frequencies
+//		W25qxx_ReadByte(&temp,freqStartByte+byteCnt);
+		byteCnt++;
+		if((temp>='0')&&(temp<='9')){
+			tempArr[chrCnt]=temp;
+			chrCnt++;
+		}
+		if(temp=='\n'){
+				switch(even){
+					case 0:									//odd position
+						for(int i=0;i<chrCnt;i++){
+							playFreqArr_1[index_1]+=(uint32_t)(tempArr[i]&0x0F)*(uint32_t)powf(10,chrCnt-1-i);
+							tempArr[i]=0;
+						}
+						index_1++;
+						even=1;
+						break;
+					case 1:									//even position
+						for(int i=0;i<chrCnt;i++){
+							playFreqArr_2[index_2]+=(uint32_t)(tempArr[i]&0x0F)*(uint32_t)powf(10,chrCnt-1-i);
+							tempArr[i]=0;
+						}
+						index_2++;
+						even=0;
+						break;
+					default:
+						break;
+					}
+			chrCnt=0;
+			strCnt++;
+		}
+	}
+	frstChMult=((float)playParamArr[7]/10)*(FPGA_GAIN/index_1);
+	scndChMult=((float)playParamArr[7]/10)*(FPGA_GAIN/index_2);
 }
 
 uint32_t freqInverse(uint32_t freq)
 {
-	uint8_t tempArr[6];
+	uint8_t tempArr[7] = {};
 	uint32_t remain;
 	
+	tempArr[6]=freq/1000000U;
+	remain=freq%1000000U;
 	tempArr[5]=freq/100000U;
 	remain=freq%100000U;
 	tempArr[4]=remain/10000U;
@@ -419,61 +407,114 @@ uint32_t freqInverse(uint32_t freq)
 	return tempArr[5]*100000U+tempArr[4]*10000U+tempArr[3]*1000U+tempArr[2]*100U+tempArr[1]*10U+tempArr[0];
 }
 
-//uint8_t steps;
-
-uint32_t calcFreq(uint32_t val)
+void setInitFreq(void)
 {
-//	static uint8_t steps;
-	//Frequency change from (f0+offset) to f0
 	if(playParamArr[4]==0 && playParamArr[5]==0){	//negative==0 and up==0
-		
-		if(playParamArr[1]==0){
-			fpgaFlags.endOfFile=1;
+		for(int i=0;i<100;i++){
+			if(playFreqArr_1[i]!=0){
+				playFreqArr_1[i]+=playParamArr[1]+playParamArr[2];
+			}
+			if(playFreqArr_2[i]!=0){
+				playFreqArr_2[i]+=playParamArr[1]+playParamArr[2];
+			}
 		}
-		else{
-			val+=playParamArr[1];
+	}
+	if(playParamArr[4]==0 && playParamArr[5]==1){	//negative==0 and up==1
+		for(int i=0;i<100;i++){
+			if(playFreqArr_1[i]!=0){
+				playFreqArr_1[i]+=playParamArr[2];
+			}
+			if(playFreqArr_2[i]!=0){
+				playFreqArr_2[i]+=playParamArr[2];
+			}
+		}
+	}
+	if(playParamArr[4]==1 && playParamArr[5]==1){	//negative==1 and up==1
+		for(int i=0;i<100;i++){
+			if(playFreqArr_1[i]!=0){
+				playFreqArr_1[i]-=playParamArr[1]-playParamArr[2];
+			}
+			if(playFreqArr_2[i]!=0){
+				playFreqArr_2[i]-=playParamArr[1]-playParamArr[2];
+			}
+		}
+	}
+	if(playParamArr[4]==1 && playParamArr[5]==0){	//negative==1 and up==0
+		for(int i=0;i<100;i++){
+			if(playFreqArr_1[i]!=0){
+				playFreqArr_1[i]-=playParamArr[2];
+			}
+			if(playFreqArr_2[i]!=0){
+				playFreqArr_2[i]-=playParamArr[2];
+			}
+		}
+	}
+}
+
+//uint32_t calcFreq(uint32_t val)
+void calcFreq(void)
+{
+	if(playParamArr[1]==playParamArr[2]){	//is offset == onset
+		fpgaFlags.endOfFile=1;
+		return;
+	}
+	
+	//Frequency change from (f0+onset+offset) to (f0+onset)
+	if(playParamArr[4]==0 && playParamArr[5]==0){	//negative==0 and up==0
+		for(int i=0;i<100;i++){
+			if(playFreqArr_1[i]!=0){
+				playFreqArr_1[i]--;
+			}
+			if(playFreqArr_2[i]!=0){
+				playFreqArr_2[i]--;
+			}
 		}
 		playParamArr[1]--;
 	}
-	//Frequency change from f0 to (f0-offset)
-	if(playParamArr[4]==1 && playParamArr[5]==0){	//negative==1 and up==0
-		
-		if(steps==playParamArr[1]){
-			fpgaFlags.endOfFile=1;
-			steps=0;
-		}
-		else{
-			val-=steps;
-		}
-//		steps++;
-	}
-	//Frequency change from f0 to (f0+offset)
+	
+	//Frequency change from (f0+onset) to (f0+onset+offset)
 	if(playParamArr[4]==0 && playParamArr[5]==1){	//negative==0 and up==1
-		
-		if(steps==playParamArr[1]){
-			fpgaFlags.endOfFile=1;
-			steps=0;
+		for(int i=0;i<100;i++){
+			if(playFreqArr_1[i]!=0){
+				playFreqArr_1[i]++;
+			}
+			if(playFreqArr_2[i]!=0){
+				playFreqArr_2[i]++;
+			}
 		}
-		else{
-			val+=steps;
+		playParamArr[1]--;
+	}
+
+	//Frequency change from (f0-onset-offset) to (f0-onset)
+	if(playParamArr[4]==1 && playParamArr[5]==1){	//negative==1 and up==1
+		for(int i=0;i<100;i++){
+			if(playFreqArr_1[i]!=0){
+				playFreqArr_1[i]++;
+			}
+			if(playFreqArr_2[i]!=0){
+				playFreqArr_2[i]++;
+			}
 		}
-//		steps++;
+		playParamArr[1]++;
 	}
-	//Validation value inverse
-	if(playParamArr[6]==1){
-		val=freqInverse(val);
+	
+	//Frequency change from (f0-onset) to (f0-onset-offset)
+	if(playParamArr[4]==1 && playParamArr[5]==0){	//negative==1 and up==0
+		for(int i=0;i<100;i++){
+			if(playFreqArr_1[i]!=0){
+				playFreqArr_1[i]--;
+			}
+			if(playFreqArr_2[i]!=0){
+				playFreqArr_2[i]--;
+			}
+		}
+		playParamArr[1]++;
 	}
-	return val;
 }
 
 
-void loadFreqToFpga(uint16_t addr)
+void loadFreqToFpga(void)
 {
-/*	uint16_t byteCnt=0;
-	uint8_t strCnt=0;
-	uint8_t chrCnt=0;
-//	uint32_t c;
-	uint8_t tempArr[]={'0','0','0','0','0','0'};
 	uint8_t buff[5];
 	uint8_t temp;
 	
@@ -481,52 +522,57 @@ void loadFreqToFpga(uint16_t addr)
 	temp=FREQ_CW;
 	while(!(SPI2->SR & SPI_SR_TXE)){}
 	spi2Transmit(&temp,1);
-//	freq=calcFreq(freq);
-	while(strCnt<playParamArr[0]){
-		W25qxx_ReadByte(&temp,addr+byteCnt);
-		byteCnt++;
-		if((temp>='0')&&(temp<='9')){
-			tempArr[chrCnt]=temp;// \todo check overflow array 
-			chrCnt++;
-			continue;
+	for(int i=0;i<100;i++){
+		if(playParamArr[6]==1){
+			freq=freqInverse(playFreqArr_1[i]);
 		}
-		if(temp=='\n'){
-			for(int i=0;i<chrCnt;i++){
-				freq+=(uint32_t)(tempArr[i]&0x0F)*(uint32_t)powf(10,chrCnt-1-i);
-				tempArr[i]=0;
-			}
-			chrCnt=0;
-			strCnt++;
-			freq=calcFreq(freq);
-			buff[0]=0x00;
-			buff[1]=0x00;
-			buff[2]=(freq & 0x00FFFFFF)>>16;
-			buff[3]=(freq & 0x00FFFFFF)>>8;
-			buff[4]=(freq & 0x00FFFFFF);
-			freq=0;
-			while(!(SPI2->SR & SPI_SR_TXE)){}
-			spi2Transmit(buff,5);
+		else{
+			freq=playFreqArr_1[i];
 		}
+		buff[0]=0x00;
+		buff[1]=0x00;
+		buff[2]=(freq & 0x00FFFFFF)>>16;
+		buff[3]=(freq & 0x00FFFFFF)>>8;
+		buff[4]=(freq & 0x00FFFFFF);
+		freq=0;
+		while(!(SPI2->SR & SPI_SR_TXE)){}
+		spi2Transmit(buff,5);
+	}
+	for(int i=0;i<100;i++){
+		if(playParamArr[6]==1){
+			freq=freqInverse(playFreqArr_2[i]);
+		}
+		else{
+			freq=playFreqArr_2[i];
+		}
+		buff[0]=0x00;
+		buff[1]=0x00;
+		buff[2]=(freq & 0x00FFFFFF)>>16;
+		buff[3]=(freq & 0x00FFFFFF)>>8;
+		buff[4]=(freq & 0x00FFFFFF);
+		freq=0;
+		while(!(SPI2->SR & SPI_SR_TXE)){}
+		spi2Transmit(buff,5);
 	}
 	FPGA_CS_H;
-	steps=steps+1;
-    */
 }
 
 void loadMultToFpga(void)
 {
 	uint8_t buff[3];
-	//load mult
+	uint8_t temp;
+	
 	buff[0]=MULT_REG1_CW;
-	buff[1]=MULT_VAL_1 >> 8;
-	buff[2]=MULT_VAL_1 & 0x00FF;
+	buff[1]=frstChMult >> 8;
+	buff[2]=frstChMult & 0x00FF;
 	while(!(SPI2->SR & SPI_SR_TXE)){}
 	FPGA_CS_L;
 	spi2Transmit(buff,3);
 	FPGA_CS_H;
+		
 	buff[0]=MULT_REG2_CW;
-	buff[1]=MULT_VAL_2 >> 8;
-	buff[2]=MULT_VAL_2 & 0x00FF;
+	buff[1]=scndChMult >> 8;
+	buff[2]=scndChMult & 0x00FF;
 	while(!(SPI2->SR & SPI_SR_TXE)){}
 	FPGA_CS_L;
 	spi2Transmit(buff,3);
@@ -553,7 +599,6 @@ void getCrc(void)
 void fileListInit(void)
 {
 	fpgaFlags.fileListUpdate=1;
-//	fpgaFlags.labelsUpdate=1;
 	fileSect=0;
 }
 
@@ -566,7 +611,7 @@ void SecToHhMmSs(uint32_t timeInSec)
 
 void setFileTimer(void)
 {
-	SecToHhMmSs((playParamArr[1]+1)*playParamArr[3]);
+	SecToHhMmSs((playParamArr[1]-playParamArr[2]+1)*playParamArr[3]);
 	fileHour=timeArr[0];
 	fileMin=timeArr[1];
 	fileSec=timeArr[2];
@@ -574,15 +619,15 @@ void setFileTimer(void)
 
 void setTotalTimer(void)
 {
-	/*
-    uint32_t time=0;
-	
+    /*
+	uint32_t time=0;
 	playParamArr[1]=0;
+	playParamArr[2]=0;
 	playParamArr[3]=0;
 	for(int i=0;i<50;i++){
 		if(!W25qxx_IsEmptySector(i,0)){
 			getControlParam(i);
-			time+=(playParamArr[1]+1)*playParamArr[3];
+			time+=(playParamArr[1]-playParamArr[2]+1)*playParamArr[3];
 			playParamArr[1]=0;
 			playParamArr[3]=0;
 		}
@@ -594,111 +639,270 @@ void setTotalTimer(void)
     */
 }
 
-//-----------------------------------for main---------------------------------------
+//void getTimers(void)
+//{
+//	if(playClk>=999){
+//		playClk=0;
+//		
+//		//Program timer
+//		if(fileSec==0){
+//			fileSec=59;
+//			if(fileMin==0){
+//				fileMin=59;
+//				if(fileHour==0){
+//					fileHour=99;
+//				}
+//				else{
+//					fileHour--;
+//				}
+//			}
+//			else{
+//				fileMin--;
+//			}
+//		}
+//		else{
+//			fileSec--;
+//		}
+//		fileTimeArr[0]=fileHour/10;
+//		fileTimeArr[1]=fileHour%10;
+//		fileTimeArr[3]=fileMin/10;
+//		fileTimeArr[4]=fileMin%10;
+//		fileTimeArr[6]=fileSec/10;
+//		fileTimeArr[7]=fileSec%10;
+//		timeToString(fileTimeArr);
+//	
+//		//Total timer
+//		if(totalSec==0){
+//			totalSec=59;
+//			if(totalMin==0){
+//				totalMin=59;
+//				if(totalHour==0){
+//					totalHour=99;
+//				}
+//				else{
+//					totalHour--;
+//				}
+//			}
+//			else{
+//				totalMin--;
+//			}
+//		}
+//		else{
+//			totalSec--;
+//		}
+//		totalTimeArr[0]=totalHour/10;
+//		totalTimeArr[1]=totalHour%10;
+//		totalTimeArr[3]=totalMin/10;
+//		totalTimeArr[4]=totalMin%10;
+//		totalTimeArr[6]=totalSec/10;
+//		totalTimeArr[7]=totalSec%10;
+//		timeToString(totalTimeArr);
+//		
+////		fpgaFlags.timeUpdate=1;
+//	}
+//	
+//}
+
+//-----------------------------------Hi level function---------------------------------------
+uint8_t curState;
+
+//typedef enum  
+//{SLD_FSM_InitialWait  		//work
+//,SLD_FSM_Off  						//work
+//,SLD_FSM_OnTransition 		//work
+//,SLD_FSM_On 							//work
+//,SLD_FSM_OffTransition 		//work
+//,SLD_FSM_DontMindSleep		//e_PS_DontMindSleep
+//,SLD_FSM_SleepTransition 	//work
+//,SLD_FSM_Sleep           	//  ready for sleep
+//,SLD_FSM_WakeTransition  	//work
+//,SLD_FSM_NumOfEl	
+//} e_SLD_FSM;
+
+/**
+\brief Map e_SLD_FSM onto e_PowerState
+
+e_PS_Work,e_PS_DontMindSleep,e_PS_ReadySleep
+*/
+const e_PowerState SLPl_Encoder[4]=
+{e_PS_ReadySleep						//SLD_FSM_InitialWait
+,e_PS_ReadySleep						//SLD_FSM_Off
+,e_PS_Work						//SLD_FSM_OnTransition
+,e_PS_Work						//SLD_FSM_On
+};
+
+//---------------------------------for power sleep---------------------------------------------
+//static e_PowerState SLPl_PowerState; 
+//static bool SLPl_GoToSleep;
+
+__inline e_PowerState SLPl_GetPowerState(void)
+{
+	 return SLPl_Encoder[curState];
+};
+
+__inline e_PowerState SLPl_SetSleepState(bool state)
+{
+	//SLPl_GoToSleep=state;
+//	return SLPl_PowerState;
+	return SLPl_Encoder[curState];
+};
+
+//---------------------------------- for power on off ------------------------------------------
+
+bool SLPl_PWR_State;
+
+__inline bool SLPl_PWRState(void)
+{
+	return SLPl_PWR_State;
+};
+
+//-------------------------for main------------------------------------------------------------
+
+
 void SLP_init(void)
 {
 	initSpi_2();
-//	fpgaFlags.fileListUpdate=1;
+	curState=0;
+	//SLPl_PowerState=e_PS_ReadySleep;//RDD for pwr
 }
 
 void SLP(void)
 {
+/*
 	if(spiDispCapture==1){
 		return;
 	}
-	//start of the generation process
-	if(fpgaFlags.playStart==1){
-		if(fpgaFlags.fpgaConfig==1){
-			fpgaFlags.fpgaConfig=0;
-//			spi1FifoClr();
-			spi2FifoClr();
-			//fpgaConfig();
-			//GPIOB->BSRR=GPIO_BSRR_BS0;	//FPGA 1.2 V off
-			//delay_ms(20);
-			//spi1FifoClr();
-			//spi2FifoClr();
-			fpgaConfig();
-			fpgaFlags.labelsUpdate=1;
-			//******************************************
-//			fpgaFlags.fpgaConfigComplete=1;	//for debug
-			//******************************************
-//			fpgaFlags.labelsUpdate=1;
-		}
-		if(fpgaFlags.fpgaConfigComplete==1){
-			playFileSector=getPlayFileSector(playFileInList);
-			setTotalTimer();
-			getControlParam(playFileSector);
-			setFileTimer();
-			//********************************************
-			//for debug
-//			SPI2->CR1 &= ~SPI_CR1_SPE;
-//			SPI2->CR1 &= ~SPI_CR1_LSBFIRST;
-//			SPI2->CR1 |= SPI_CR1_SPE;
-			//********************************************
-//			freq=calcFreq(freq);
-			loadFreqToFpga(freqStartByte);
-			loadMultToFpga();
-			startFpga();
-//			getCrc();
-			
-			//begin generation
-			fpgaFlags.playStart=0;
-			fpgaFlags.clockStart=1;
-			fpgaFlags.playBegin=1;
-			fpgaFlags.labelsUpdate=1;
-		}
-	}
-	
-	//generation process
-	if(fpgaFlags.playBegin==1){
-		if(durTimeMs>=999){
-			durTimeS++;
-			durTimeMs=0;
-//			steps=steps+1000;
-		}
-		if(durTimeS>=playParamArr[3]){
-			FPGA_START_H;
-			delay_ms(1);
-			FPGA_START_L;
-			durTimeS=0;
-//			spi1FifoClr();
-			spi2FifoClr();
-//			steps=steps+1000;
-//			freq=calcFreq(freq);
-			loadFreqToFpga(freqStartByte);
-		}
-	}
-	
-	//end of generation process
-	if(fpgaFlags.playStop==1){
-		GPIOB->BSRR=GPIO_BSRR_BS0;	//FPGA 1.2 V off
-		fpgaFlags.fpgaConfigComplete=0;
-		fpgaFlags.playBegin=0;
-		fpgaFlags.clockStart=0;
-		fpgaFlags.labelsUpdate=1;
-		//NVIC_SystemReset();
-	}
-	
-	//get list of files
-	if(fpgaFlags.fileListUpdate==1){
+	switch(curState){
+		//file list initialization
+		case 0:
+			if(fpgaFlags.fileListUpdate==1){
+//				if(!W25qxx_IsEmptySector(fileSect,0)){
+///rdd debug					spi1FifoClr();
+//					W25qxx_ReadSector((uint8_t*)fileName,fileSect,FILE_NAME_SHIFT,FILE_NAME_BYTES);
+//					fpgaFlags.addListItem=1;
+				}
+				if(fileSect>=MAX_FILES_NUM){
+					fileSect=0;
+					fpgaFlags.fileListUpdate=0;
+					fpgaFlags.addListItem=0;
+					curState=1;
+				}
+				else{
+					fileSect++;
+				}
+			}
+			break;
 		
-        /*
-        if(!W25qxx_IsEmptySector(fileSect,0)){
-			spi1FifoClr();
-			W25qxx_ReadSector((uint8_t*)fileName,fileSect,FILE_NAME_SHIFT,FILE_NAME_BYTES);
-			fpgaFlags.addListItem=1;
-		}
-        */
-        
-		if(fileSect>=MAX_FILES_NUM){
-			fileSect=0;
-			fpgaFlags.fileListUpdate=0;
-			fpgaFlags.addListItem=0;
-		}
-		else{
-			fileSect++;
-		}
+		//waiting for start 
+		case 1:
+			if(fpgaFlags.playStart==1){
+				fpgaFlags.playStart=0;
+				curState=2;
+			}
+			if(fpgaFlags.addNewListItem==1){
+///rdd debug				spi1FifoClr();
+//				W25qxx_ReadSector((uint8_t*)fileName,startSectAddr,FILE_NAME_SHIFT,FILE_NAME_BYTES);
+			}
+			break;
+			
+		//preparation for the generation process
+		case 2:
+			//SLPl_PowerState=e_PS_Work;//RDD for pwr
+		
+			PM_OnOffPWR(PM_Player,true );//RDD ON POWER
+		  initSpi_2();
+///rdd debug			spi1FifoClr();
+			spi2FifoClr();
+		
+			fpgaFlags.fpgaConfig=1;
+			fpgaConfig();
+//			fpgaFlags.fpgaConfigComplete=1;	//for debug
+			fpgaFlags.labelsUpdate=1;
+			if(fpgaFlags.fpgaConfigComplete==1){
+				playFileSector=playFileInList;
+				playFileSectorBegin=playFileSector;
+				setTotalTimer();
+				getControlParam(playFileSector);
+				verifyControlParam();
+				getFreq(playFileSector);
+				setFileTimer();
+				setInitFreq();
+				loadFreqToFpga();
+				loadMultToFpga();
+				startFpga();
+				fpgaFlags.clockStart=1;
+				fpgaFlags.playBegin=1;
+				fpgaFlags.labelsUpdate=1;
+				curState=3;
+			}
+			else{
+				curState=1;
+			}
+			break;
+			
+		//generation process	
+		case 3:
+//			getTimers();
+			if(durTimeMs>=999){
+				durTimeS++;
+				durTimeMs=0;
+			}
+			if(durTimeS>=playParamArr[3]){
+				startFpga();
+				durTimeS=0;
+///rdd debug				spi1FifoClr();
+				spi2FifoClr();
+				calcFreq();
+				if(fpgaFlags.endOfFile==1){
+					playFileSector++;
+					if(playFileSector<=LAST_PLAY_SECT && !W25qxx_IsEmptySector(playFileSector,0)){
+						playFileInList=playFileSector;
+						if(playFileSector==playFileSectorBegin)
+							setTotalTimer();
+						getControlParam(playFileSector);
+						verifyControlParam();
+						getFreq(playFileSector);
+						setFileTimer();
+						setInitFreq();
+						loadFreqToFpga();
+						loadMultToFpga();
+					}
+					else{
+						playFileSector=0;
+						playFileInList=playFileSector;
+						if(playFileSector==playFileSectorBegin)
+							setTotalTimer();
+//						setTotalTimer();
+						getControlParam(playFileSector);
+						verifyControlParam();
+						getFreq(playFileSector);
+						setFileTimer();
+						setInitFreq();
+						loadFreqToFpga();
+						loadMultToFpga();
+					}
+					
+				}
+				loadFreqToFpga();
+			}
+			if(fpgaFlags.playStop==1){
+				fpgaFlags.playStop=0;
+				GPIOB->BSRR=GPIO_BSRR_BS0;	//FPGA 1.2 V off
+				fpgaFlags.fpgaConfigComplete=0;
+				fpgaFlags.playBegin=0;
+				fpgaFlags.clockStart=0;
+//				SLPl_PowerState=e_PS_ReadySleep;//RDD for pwr
+				
+				disableSpi_2();
+				PM_OnOffPWR(PM_Player,false );//RDD OFF POWER
+				
+				curState=1;
+			}
+			break;
+		default:
+			break;
 	}
+    */
 }
 
 

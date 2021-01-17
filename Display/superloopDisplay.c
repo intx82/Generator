@@ -2,7 +2,7 @@
 \file
 \brief High Level Display control
 
-
+\todo SLD_PowerState
 */	
 
 
@@ -10,7 +10,7 @@
 \brief info on display for debug ACC 
 
 */
-#define def_debug_AccDispay
+//#define def_debug_AccDispay
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -21,39 +21,157 @@
 #include "BoardSetup.h"
 #include "Spi1.h"
 
-extern char	heap[GFX_OS_HEAP_SIZE];
-extern gThread	hThread;
+//-------------------------for main-----------------------------------------------
+uint16_t playFileSector;
+
 
 uint8_t fileSect=0;
 
 
-void GFXPreinit (void)
-{ 
-	uint32_t i;
+typedef enum  
+{SLD_FSM_InitialWait  		//work
+,SLD_FSM_Off  						//work
+,SLD_FSM_OnTransition 		//work
+,SLD_FSM_On 							//work
+,SLD_FSM_OffTransition 		//work
+,SLD_FSM_DontMindSleep		//e_PS_DontMindSleep
+,SLD_FSM_SleepTransition 	//work
+,SLD_FSM_Sleep           	//  ready for sleep
+,SLD_FSM_WakeTransition  	//work
+,SLD_FSM_NumOfEl	
+} e_SLD_FSM;
 
-	for (i=0;i<GFX_OS_HEAP_SIZE;i++)
-	{heap[i]=0;};
-	hThread=0;
+/**
+\brief Map e_SLD_FSM onto e_PowerState
+
+e_PS_Work,e_PS_DontMindSleep,e_PS_ReadySleep
+*/
+const e_PowerState SLD_Encoder[SLD_FSM_NumOfEl]=
+{e_PS_Work						//SLD_FSM_InitialWait
+,e_PS_Work						//SLD_FSM_Off
+,e_PS_Work						//SLD_FSM_OnTransition
+,e_PS_Work						//SLD_FSM_On
+,e_PS_Work						//SLD_FSM_OffTransition 
+,e_PS_DontMindSleep		//SLD_FSM_DontMindSleep	
+,e_PS_DontMindSleep		//SLD_FSM_SleepTransition
+,e_PS_ReadySleep			//SLD_FSM_Sleep
+,e_PS_Work						//SLD_FSM_WakeTransition
 };
 
-//------------------------- for power--------------------------------------
-bool SuperLoop_Disp_SleepIn(void)
+static e_SLD_FSM state_inner;
+
+//---------------------------------for power sleep---------------------------------------------
+//static e_PowerState SLD_PowerState; 
+static bool SLD_GoToSleep;
+
+__inline e_PowerState SLD_GetPowerState(void)
 {
-	return true;
+	 return SLD_Encoder[state_inner];
 };
-bool SuperLoop_Disp_SleepOut(void)
+
+__inline e_PowerState SLD_SetSleepState(bool state)
 {
-	return true;
+	SLD_GoToSleep=state;
+	return SLD_Encoder[state_inner];
 };
 
-//------------------------for FSM-------------------------------------------
-static e_FSMState_SuperLoopDisplay SLD_FSM_State;
 
-//------------------------ for update ------------------------------------------
+//------------------------ for Display update ----------------------------------
 static systemticks_t LastUpdateTime;
 #define DisplayUpdatePeriod 1000
 
-//--------------------------------for uGFX--------------------------------------
+
+//---------------------- Control grafical objects------------------------------
+int SLDw(void);
+void displayACC(void);
+int SLDwACC(void);
+//------------------------FSM control--------------------------------------------
+int SLD_DisplInit(void);
+int SLD_DisplReInit(void);
+int SLD_DisplDeInit(void);
+
+#define SLD_SleepDelay 1000
+
+int SLD(void)
+{
+	systemticks_t SLD_LastButtonPress;
+	switch (state_inner)
+	{
+		case SLD_FSM_InitialWait: // initial on
+			if (bVSYS) {state_inner=SLD_FSM_OnTransition;};
+			break;
+		case SLD_FSM_Off:	// off
+			if (button_sign&&bVSYS)
+			{
+				state_inner=SLD_FSM_OnTransition;
+				button_sign=0;
+			}
+			else
+			{ 
+				SLD_LastButtonPress=BS_LastButtonPress;
+				if (((SystemTicks-SLD_LastButtonPress)>SLD_SleepDelay)) 
+					 state_inner=SLD_FSM_DontMindSleep;
+			};
+			break;
+		case SLD_FSM_OnTransition: //on transition
+				PM_OnOffPWR(PM_Display,true );
+				SLD_DisplInit();
+//		    gwinRedrawDisplay(NULL,true);
+		    state_inner=SLD_FSM_On;
+//   break;
+		case SLD_FSM_On: // on
+#ifdef def_debug_AccDispay
+	    	SLDwACC();
+#else
+		    SLDw();
+#endif		
+  		if ((!bVSYS)|button_sign)
+			{
+				button_sign=0;
+				state_inner=SLD_FSM_OffTransition;
+			};
+			break;
+		case SLD_FSM_OffTransition: 
+      	SLD_DisplDeInit();               //off transition
+        PM_OnOffPWR(PM_Display,false );				
+				state_inner=SLD_FSM_Off;
+		  break;	
+		case SLD_FSM_DontMindSleep:
+			  SLD_LastButtonPress=BS_LastButtonPress;
+		    if (SLD_GoToSleep) 
+						state_inner=SLD_FSM_SleepTransition;
+				if (((SystemTicks-SLD_LastButtonPress)<SLD_SleepDelay)) 
+						state_inner=SLD_FSM_Off;  //has more priority
+			break;
+		case SLD_FSM_SleepTransition:// sleep transition
+		  //reset interrupt pending
+		  PM_ClearPendingButton;
+		  state_inner=SLD_FSM_Sleep; 
+		  //break;
+		case SLD_FSM_Sleep:
+			//SLD_PowerState= e_PS_ReadySleep;
+//			SLD_PWR_State=	false;		
+        SLD_LastButtonPress=BS_LastButtonPress;
+				if ((!SLD_GoToSleep) || ((SystemTicks-SLD_LastButtonPress)<SLD_SleepDelay)) 
+				{state_inner=SLD_FSM_WakeTransition;
+				};
+		    
+			break;
+		case SLD_FSM_WakeTransition: //wake transition
+		  state_inner=SLD_FSM_Off;
+		break;
+    default: state_inner=SLD_FSM_InitialWait;		
+	};
+	return 0;
+}
+
+int SLD_init(void)
+{
+	return 0;
+};
+
+
+////------------------------Display control--------------------------------------------
 GListener	gl;
 GHandle	ghLabel1, ghLabel2, ghLabel3, ghLabel4, ghLabel5, ghLabel6, ghLabel7;
 GHandle ghLabel8, ghLabel9, ghLabel10, ghLabel11, ghLabel12;
@@ -64,90 +182,22 @@ static	GEvent* pe;
 //static	unsigned which;
 
 static void createDebugLabels(void);
-//---------------------- Control grafical objects------------------------------
-int SLDw(void);
-void displayACC(void);
-int SLDwACC(void);
-//------------------------FSM control--------------------------------------------
-int SLD_DisplInit(void);
-int SLD_DisplReInit(void);
-int SLD_DisplDeInit(void);
 
+//--------------------------------for uGFX--------------------------------------
+extern char	heap[GFX_OS_HEAP_SIZE];
+extern gThread	hThread;
 
-__inline e_FSMState_SuperLoopDisplay SLD_FSMState(void)
-{
-	return SLD_FSM_State;
-};
-static uint8_t state_inner;
-//-------------------------for main-----------------------------------------------
-int SLD(void)
-{
-	switch (state_inner)
-	{
-		case 0: 
-			SLD_FSM_State=	e_FSMS_SLD_Off;
-			if (bVSYS)
-			{
-				while (e_FRS_Done!=MainTransition_P_Displ(e_FSMS_SLD_On,e_FSMS_SLD_Off));
-				while (e_FRS_Done!=MainTransition_P_Displ(e_FSMS_SLD_On,e_FSMS_SLD_On));
-				delayms(100);
-				SLD_DisplInit();
+//uint8_t fileSect=0;
 
-				SLD_FSM_State=e_FSMS_SLD_On;
-		    state_inner=3;
-			}	
-			break;
-		case 1:	
-			SLD_FSM_State=	e_FSMS_SLD_Off;
-			if (button_sign&&bVSYS)
-			{
-				state_inner=2;
-				button_sign=0;
-			};
-			break;
-		case 2:
-				while (e_FRS_Done!=MainTransition_P_Displ(e_FSMS_SLD_On,e_FSMS_SLD_Off));
-				while (e_FRS_Done!=MainTransition_P_Displ(e_FSMS_SLD_On,e_FSMS_SLD_On));
-				SLD_DisplInit();
-				SLD_FSM_State=e_FSMS_SLD_On;
-		    state_inner=3;
+void GFXPreinit (void)
+{ 
+	uint32_t i;
 
-		case 3: 
-#ifdef def_debug_AccDispay
-	    	SLDwACC();
-#else
-		    SLDw();
-#endif		
-  		if ((!bVSYS)|button_sign)
-			{
-				SLD_DisplDeInit();
-				
-				while (e_FRS_Done!=MainTransition_P_Displ(e_FSMS_SLD_Off,e_FSMS_SLD_On));
-				while (e_FRS_Done!=MainTransition_P_Displ(e_FSMS_SLD_Off,e_FSMS_SLD_Off));
-				
-				button_sign=0;
-				SLD_FSM_State=e_FSMS_SLD_Off;
-				state_inner=1;
-			};
-			break;
-    default: SLD_FSM_State=	e_FSMS_SLD_Off;		
-	};
-	return 0;
-}
-
-int SLD_init(void)
-{
-	return 0;
+	for (i=0;i<GFX_OS_HEAP_SIZE;i++)
+	{heap[i]=0;};
+	hThread=0;
 };
 
-////------------------------FSM control--------------------------------------------
-
-//GListener	gl;
-//GHandle		ghLabel1, ghLabel2, ghLabel3, ghLabel4, ghLabel5, ghLabel6, ghLabel7;
-//GHandle		ghList1 /*, ghList2*/;
-//static	GEvent* pe;
-//static	unsigned which;
-//static GHandle  ghButton1, ghButton2;
 
 int SLD_DisplDeInit(void)
 {
@@ -177,7 +227,7 @@ extern uint8_t totalHour;
 extern uint8_t fileSec;
 extern uint8_t fileMin;
 extern uint8_t fileHour;
-volatile uint32_t playClk;
+//volatile uint32_t playClk;
 volatile int playFileInList;
 uint8_t fileName[50];
 void displayACC(void)
@@ -219,9 +269,8 @@ int SLDwACC(void)
 { 
 	//event handling
 	pe = geventEventWait(&gl,10 ); //gDelayForever
-	
-    displayACC();
-    return 0;
+	displayACC();
+	return 0;
 }
 
 static void createLists(void) {
@@ -334,7 +383,7 @@ int SLD_DisplInit(void)
     GFXPreinit();	
     gfxInit();	
 
-	
+
 	// Set the widget defaults
 	gwinSetDefaultFont(gdispOpenFont("U11"));
 	gwinSetDefaultStyle(&WhiteWidgetStyle, gFalse);
@@ -368,7 +417,9 @@ int SLDw(void)
 //				fpgaFlags.labelsUpdate=1;
 			}
 			if (((GEventGWinButton*)pe)->gwin == ghButton2){
-				fpgaFlags.playStop=1;
+				if(curState==3){
+					fpgaFlags.playStop=1;
+				}
 			}
 			break;
 		default:
@@ -384,63 +435,86 @@ int SLDw(void)
 		}
 	}
 	
+	if(fpgaFlags.addNewListItem==1){
+		fpgaFlags.addNewListItem=0;
+		gwinListAddItem(ghList1, (char*)fileName, gTrue);
+	}
+	
+	if(fpgaFlags.clearList==1){
+		fpgaFlags.clearList=0;
+		gwinListDeleteAll(ghList1);
+	}
+	
+	if(fpgaFlags.endOfFile==1){
+		fpgaFlags.endOfFile=0;
+		gwinListSetSelected(ghList1,playFileSector,TRUE);
+		gwinSetText(ghLabel5,gwinListGetSelectedText(ghList1),gFalse);
+//			playFileInList=gwinListGetSelected(ghList1);
+	}
+	
+	if(fpgaFlags.playStop==1){
+//		fpgaFlags.playStop=0;
+		gwinSetText(ghLabel3,"Init OK",gFalse);
+		gwinSetText(ghLabel4,"Stop",gFalse);
+		gwinSetText(ghLabel5,"Not selected",gFalse);
+		gwinSetText(ghLabel6,"00:00:00",gFalse);
+		gwinSetText(ghLabel7,"00:00:00",gFalse);
+		totalSec=0;
+		totalMin=0;
+		totalHour=0;
+		fileSec=0;
+		fileMin=0;
+		fileHour=0;
+	}
+	
+	if(fpgaFlags.fpgaConfig==1){
+		fpgaFlags.fpgaConfig=0;
+		gwinSetText(ghLabel3,"Config. Please wait",gFalse);
+	}
+	
 	if(fpgaFlags.labelsUpdate==1){
 		fpgaFlags.labelsUpdate=0;
 		if(fpgaFlags.fpgaConfigComplete==1){
-			gwinSetText(ghLabel3,"Config OK",gTrue);
+			gwinSetText(ghLabel3,"Config OK",gFalse);
 		}
 		else{
-			gwinSetText(ghLabel3,"Config failed",gTrue);
+			gwinSetText(ghLabel3,"Config failed",gFalse);
 		}
 		if(fpgaFlags.playBegin==1){
-			gwinSetText(ghLabel4,"Start",gTrue);
-			gwinSetText(ghLabel5,gwinListGetSelectedText(ghList1),gTrue);
-		}
-		if(fpgaFlags.playStop==1){
-			fpgaFlags.playStop=0;
-			gwinSetText(ghLabel3,"Init OK",gTrue);
-			gwinSetText(ghLabel4,"Stop",gTrue);
-			gwinSetText(ghLabel5,"Not selected",gTrue);
-			gwinSetText(ghLabel6,"00:00:00",gTrue);
-			gwinSetText(ghLabel7,"00:00:00",gTrue);
-			totalSec=0;
-			totalMin=0;
-			totalHour=0;
-			fileSec=0;
-			fileMin=0;
-			fileHour=0;
+			gwinSetText(ghLabel4,"Start",gFalse);
+			gwinSetText(ghLabel5,gwinListGetSelectedText(ghList1),gFalse);
 		}
 	}
+	
+//	if(fpgaFlags.timeUpdate==1){
+//		fpgaFlags.timeUpdate=0;
+//	
+//		gwinSetText(ghLabel6,fileTimeArr,gFalse);
+//		
+//		
+//		gwinSetText(ghLabel7,totalTimeArr,gFalse);
+//		
+//	}
 	
 	if(playClk>=999){
 		playClk=0;
 		
 		//Program timer
-		if(fpgaFlags.endOfFile==1){
-			fpgaFlags.endOfFile=0;
-			fileHour=0;
-			fileMin=0;
-			fileSec=0;
-		}
-		else{
-			if(fileSec==0){
-				fileSec=59;
-				if(fileMin==0){
-					fileMin=59;
-					if(fileHour==0){
-						fileHour=99;
-					}
-					else{
-						fileHour--;
-					}
+		if(fileSec==0){
+			fileSec=59;
+			if(fileMin==0){
+				fileMin=59;
+				if(fileHour==0){
+					fileHour=99;
 				}
 				else{
-					fileMin--;
+					fileHour--;
 				}
 			}
 			else{
-				fileSec--;
+				fileMin--;
 			}
+
 			fileTimeArr[0]=fileHour/10;
 			fileTimeArr[1]=fileHour%10;
 			fileTimeArr[3]=fileMin/10;
@@ -450,7 +524,18 @@ int SLDw(void)
 			timeToString(fileTimeArr);
 			gwinSetText(ghLabel6,(const char*)fileTimeArr,gTrue);
 		}
-		
+		else{
+			fileSec--;
+		}
+		fileTimeArr[0]=fileHour/10;
+		fileTimeArr[1]=fileHour%10;
+		fileTimeArr[3]=fileMin/10;
+		fileTimeArr[4]=fileMin%10;
+		fileTimeArr[6]=fileSec/10;
+		fileTimeArr[7]=fileSec%10;
+		timeToString(fileTimeArr);
+		gwinSetText(ghLabel6,(const char*)fileTimeArr,gFalse);
+	
 		//Total timer
 		if(totalSec==0){
 			totalSec=59;

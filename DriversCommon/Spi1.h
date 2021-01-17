@@ -14,6 +14,7 @@ void spi1_init(void);
 * @return Output byte
 */
 uint8_t spi_transfer(uint8_t data);
+extern void disableSpi_1(void);
 
 /**
 * Enable SPI-Flash CS (Set low level at PB3)

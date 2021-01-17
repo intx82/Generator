@@ -2,6 +2,7 @@
 #include "SuperLoop_Comm.h"
 
 uint8_t usbCmd;
+extern uint16_t startSectAddr;
 uint16_t startPageAddr;
 uint32_t rxIrqCnt;
 uint16_t startPageAddr;
@@ -33,6 +34,7 @@ volatile struct{
 	uint16_t stopWrite				:1;
 }usbFlags;
 
+//---------------------------------------------for main----------------------------------------------------
 void SLC_init(void)
 {
 	uart1Init();
@@ -46,6 +48,19 @@ void SLC(void)
 	
 	procCmdFromUsb();
 }
+
+//---------------------------------------------for power----------------------------------------------------
+void Communication_InSleep()
+{
+	RCC->APBENR2 |= RCC_APBENR2_USART1EN;
+	USART1->CR1 &= ~USART_CR1_UE;
+	RCC->APBENR2 &= ~RCC_APBENR2_USART1EN;
+};
+
+void Communication_OutSleep()
+{
+  uart1Init();	
+};
 
 void uart1Init(void)
 {
@@ -74,8 +89,6 @@ void procCmdFromUsb(void)
 			return;
 		case WR_PLAY_FILES:
 			wrPlayFiles();
-//			NVIC_SystemReset();
-//			fpgaFlags.fileListUpdate=1;
 			return;
 		case RD_CONF_FILE:
 //			rdConfFile();
@@ -86,15 +99,16 @@ void procCmdFromUsb(void)
 //			rdFlash();
 			return;
 		case ER_CONF_FILE:
-			erFlash(FIRST_CONF_SECT,LAST_CONF_SECT);
-			confSectorsStatus();
+//			erFlash(FIRST_CONF_SECT,LAST_CONF_SECT);
+//		W25qxx_EraseChip();
+//			confSectorsStatus();
 			usbCmd=0;
 		  rxIrqCnt=0;
 			//NVIC_SystemReset();
 			return;
 		case ER_PLAY_FILES:
 			erFlash(FIRST_PLAY_SECT,LAST_PLAY_SECT);
-			playSectorsStatus();
+//			playSectorsStatus();
 			usbCmd=0;
 		  rxIrqCnt=0;
 			//NVIC_SystemReset();
@@ -128,7 +142,8 @@ void wrPlayFiles(void)
 		usbFlags.buff0DataRdy=0;
 		usbFlags.buff1DataRdy=0;
 		usbFlags.getStartAddr=0;
-		fpgaFlags.fileListUpdate=1;
+//		fpgaFlags.fileListUpdate=1;
+		fpgaFlags.addNewListItem=1;
 	}
 }
 
@@ -149,7 +164,7 @@ void wrConfFile(void)
 		usbFlags.buff0DataRdy=0;
 		usbFlags.buff1DataRdy=0;
 		usbFlags.getStartAddr=0;
-		fpgaFlags.fileListUpdate=1;
+//		fpgaFlags.fileListUpdate=1;
 	}
 }
 

@@ -3,6 +3,8 @@
 
 #include "stm32g0xx.h"
 
+
+//#define __flashInit() W25qxx_Init()
 #define PAGE_SIZE 			256
 #define SECTOR_SIZE 		4096
 #define SECTORS_NUM			512
