@@ -3,7 +3,7 @@
  * Auto generated Run-Time-Environment Configuration File
  *      *** Do not modify ! ***
  *
- * Project: 'Generator070-release' 
+ * Project: 'Generator070_release' 
  * Target:  'Target 1' 
  */
 
