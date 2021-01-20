@@ -231,14 +231,14 @@ int spiffs_write_file_part(const char *filename, size_t fname_len, uint32_t offs
     }
     */
     
-    spiffs_file fd;
+    static spiffs_file fd;
     if(offset == 0)
     {
         fd = SPIFFS_open(&fs, filename, SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_RDWR, 0);
     }
     else
     {
-        fd = SPIFFS_open(&fs, filename, SPIFFS_RDWR | SPIFFS_APPEND, 0);
+  //      fd = SPIFFS_open(&fs, filename, SPIFFS_RDWR | SPIFFS_APPEND, 0);
         
         spiffs_stat s;
         res = SPIFFS_fstat(&fs, fd, &s);
@@ -248,7 +248,7 @@ int spiffs_write_file_part(const char *filename, size_t fname_len, uint32_t offs
             res = SPIFFS_ERR_END_OF_OBJECT;
         }
         
-        if(res == 0)
+        if((res == 0) && (offset != s.size))
         {
             if (SPIFFS_lseek(&fs, fd, offset, SPIFFS_SEEK_SET) < 0)
             {
@@ -267,7 +267,7 @@ int spiffs_write_file_part(const char *filename, size_t fname_len, uint32_t offs
     
     SPIFFS_fflush(&fs,fd);
     
-    SPIFFS_close(&fs, fd);
+    //SPIFFS_close(&fs, fd);
     return res;
 }
 

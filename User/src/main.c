@@ -49,7 +49,7 @@ int spiffs_init();
 #endif
 
 #ifdef RELEASE
-#define APPLICATION_ADDRESS (uint32_t)0x08003800 /**  offset start address */
+#define APPLICATION_ADDRESS (uint32_t)0x08001800 /**  offset start address */
 
 void _ttywrch(int ch)
 {
@@ -151,15 +151,15 @@ SL_CommModbusInit();
   while(1){
 
 #ifdef 	COMMS 
-SLC();
+//SLC();
 #endif
 
 #ifdef 	PLAYER 
-SLP();
+//SLP();
 #endif
 		
 #ifdef LCDUSE
-SLD();
+//SLD();
 
 #endif
 			
@@ -167,7 +167,7 @@ SLD();
 //GPIOB->BSRR = GPIO_BSRR_BS10;		
 			
 #ifdef ACCUSE
-SuperLoopACC();
+//SuperLoopACC();
 #endif	
 			
 //GPIOB->BSRR = GPIO_BSRR_BR10;	
@@ -179,7 +179,7 @@ SuperLoop_PowerModes();
 #ifdef MODBUS
 SL_CommModbus();
 #endif
-		
+
   }
 }
 
