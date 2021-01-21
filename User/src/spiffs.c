@@ -234,6 +234,7 @@ int spiffs_write_file_part(const char *filename, size_t fname_len, uint32_t offs
     static spiffs_file fd;
     if(offset == 0)
     {
+        SPIFFS_close(&fs, fd);
         fd = SPIFFS_open(&fs, filename, SPIFFS_CREAT | SPIFFS_TRUNC | SPIFFS_RDWR, 0);
     }
     else
@@ -267,7 +268,7 @@ int spiffs_write_file_part(const char *filename, size_t fname_len, uint32_t offs
     
     SPIFFS_fflush(&fs,fd);
     
-    //SPIFFS_close(&fs, fd);
+    
     return res;
 }
 
