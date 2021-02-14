@@ -235,72 +235,88 @@ INIT_DONE released high
       ->
 Executes your design
 */
+
 #define CONF_FILE_SIZE  718569
-#define CONF_BUF_SIZE 64
+
 void fpgaConfig(void)											//
 {
-	s32_t fpga_file;
-	int32_t read_res;
-	
-	fpga_file=SPIFFS_open(&fs, "FPGA.rbf", SPIFFS_O_RDONLY, 0);
-	
-	uint32_t bytesCnt=0;
-	uint8_t byteBuff[CONF_BUF_SIZE];
-	uint8_t bytesToRead=CONF_BUF_SIZE;
-	uint32_t bytesRemain=CONF_FILE_SIZE;
-//	byteBuff=0;
-//	spi2Transmit(&byteBuff, 1);
-	
+	spiffs_file fpga_file = SPIFFS_open(&fs, "FPGA.rbf", SPIFFS_O_RDONLY, 0);
+    if(fpga_file < 0)
+    {
+        return;
+    }
+    
+    spiffs_stat s;
+    s32_t res = SPIFFS_fstat(&fs, fpga_file, &s);
+    
+    if(res != 0 || CONF_FILE_SIZE != s.size)
+    {
+        goto _exit;
+    }
+
+    
 	SPI2->CR1 &= ~SPI_CR1_SPE;
 	SPI2->CR1 |= SPI_CR1_LSBFIRST;
 	SPI2->CR1 |= SPI_CR1_SPE;
 	
 	switchOUTStageInterfacePinsToPwr(DISABLE);//RDD DEBUG
-	delay_ms(100);// test -> ok
+    delay_ms(100);// test -> ok
 	switchOUTStageInterfacePinsToPwr(ENABLE);
 	delay_ms(10);
-///rdd debug	spi1FifoClr();
-//	GPIOB->BSRR=GPIO_BSRR_BR0;							//FPGA 1.2 V on
-	nCONFIG_H;
-	while(!(GPIOC->IDR & GPIO_IDR_ID7)){/** \todo timeout */}
-	delay_ms(10);
-	FPGA_CS_L;															//for logger
-	do{
-//	for(bytesCnt=0;bytesCnt<CONF_FILE_SIZE;bytesCnt++){
-		read_res=SPIFFS_read(&fs, fpga_file, &byteBuff, bytesToRead);
-		if (read_res<bytesToRead)
-		{	break;
-		};
-		spi2Transmit(byteBuff, bytesToRead);
-		if(GPIOC->IDR & GPIO_IDR_ID6)
-			{byteBuff[0]=0;
-			spi2Transmit(byteBuff, 1);
-			fpgaFlags.fpgaConfigComplete=1;
-			FPGA_CS_H;
-			SPI2->CR1 &= ~SPI_CR1_SPE;
-			SPI2->CR1 &= ~SPI_CR1_LSBFIRST;
-			SPI2->CR1 |= SPI_CR1_SPE;
-			
-      SPIFFS_close(&fs, fpga_file);				
-			return;
-		}
-//	}
-		bytesRemain-=bytesToRead;
-		if(bytesRemain>=CONF_BUF_SIZE)
-			bytesToRead=CONF_BUF_SIZE;
-		else
-			bytesToRead=bytesRemain;
-	}while(bytesToRead!=0);
-//	byteBuff=0;
-//	spi2Transmit(&byteBuff, 1);
-	FPGA_CS_H;
-//	confFailed();
-	SPI2->CR1 &= ~SPI_CR1_SPE;
-	SPI2->CR1 &= ~SPI_CR1_LSBFIRST;
-	SPI2->CR1 |= SPI_CR1_SPE;
 
-	fpgaFlags.fpgaConfigComplete=0;
-	SPIFFS_close(&fs, fpga_file);
+	nCONFIG_H;
+    uint32_t timeout = 1000;
+	while(!(GPIOC->IDR & GPIO_IDR_ID7) && timeout)
+    {
+        delay_ms(1);
+        timeout--;
+        if(timeout == 0)
+        {
+            goto _exit;
+        }
+    }
+        
+	delay_ms(10);
+    FPGA_CS_L;															//for logger
+    
+    int32_t readed = 0;
+    do
+    {
+        uint8_t buf[64] = {0};
+        readed = SPIFFS_read(&fs, fpga_file, &buf, sizeof(buf));
+        if(readed <= 0)
+		{	
+            break;
+		}
+        
+        for(uint8_t iter = 0; iter < readed; iter++)
+        {
+            //spi_transfer(buf[iter], SPI2);
+            spi2Transmit(&buf[iter], 1);
+            if(GPIOC->IDR & GPIO_IDR_ID6)
+			{
+                buf[iter] = 0;
+                spi2Transmit(&buf[iter], 1);
+              //spi_transfer(0, SPI2);
+                
+                fpgaFlags.fpgaConfigComplete=1;
+                goto _exit;
+            }
+        }
+        
+		
+	} 
+    while(readed > 0);
+    fpgaFlags.fpgaConfigComplete=0;
+    
+    _exit:
+    FPGA_CS_H;
+    SPI2->CR1 &= ~SPI_CR1_SPE;
+    SPI2->CR1 &= ~SPI_CR1_LSBFIRST;
+    SPI2->CR1 |= SPI_CR1_SPE;
+    
+    SPIFFS_close(&fs, fpga_file);
+    return;    
 }
 
 //extern uint8_t fileName[50];
